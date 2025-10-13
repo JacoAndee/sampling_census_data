@@ -1,0 +1,251 @@
+---
+title: "Sampling Poverty from California Census Tracts"
+output:
+  html_document:
+    df_print: paged
+---
+
+**Author: Jacob Anderson**
+
+**Sampling from American Community Survey Data**
+
+```{r Load tidycensus, sf, dplyr, ggplot2}
+
+library(tidycensus)
+library(sf)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r Apply credentials}
+
+### Save the census api key in script
+
+tidycensus::census_api_key(
+  key = "1d9fe19026f3759c68bc48e2c7ddf1b2b17ec47b",
+  install = F, 
+  overwrite = F)
+```
+
+```{r Set variables and make request to ACS API}
+
+### Setting the variables to extract from ACS
+
+vars = c(total_pop = "B01001_001E",
+         tot_pov = "B17020_002E")
+ca_acs <- get_acs(geography = "tract",
+                  state = "CA",
+                  variables = vars,
+                  year = 2022,
+                  geometry = T,
+                  output = "wide",
+                  survey = "acs5"
+) %>%
+  st_transform(3310) %>%
+  mutate(pct_pov = tot_pov / total_pop)
+
+### Store the ACS data as data frame
+
+tract_acs_df <- as.data.frame(ca_acs)
+
+### Inspect the ACS table
+
+head(tract_acs_df)
+```
+
+```{r Setting Seed for reproducability}
+
+### Set seed for reproducability
+
+set.seed(1)
+```
+
+```{r Defining and Printing Random Variables}
+
+### Poverty rate
+
+y <- tract_acs_df$pct_pov
+
+y <- y[is.finite(y)]
+
+n <- length(y)
+
+### Population mean from ACS data
+
+pop_mean <- mean(y, na.rm = T)
+
+### Population standard deviation from ACS data
+
+pop_sd <- sd(y, na.rm = T)
+
+mean_val <- pop_mean
+
+std_val <- pop_sd
+
+### Define n as the number of samples
+
+n <- 100
+
+### Creating a new variable 'x' and populating the rnorm function with the mean and standard deviation values to simulate a random normal distribution
+
+x <- rnorm(n, mean = mean_val, sd = std_val)
+
+print(x)
+```
+
+**How Many Samples are Enough?**
+
+```{r Sampling from the population}
+
+### Define a for loop where the sample size takes values 2 and 10000
+### Get Samples for the desired population mean and standard deviation
+### Compute the Sample Mean and Sample Standard Deviation in two temporary variables mean_temp and std_temp
+### Append mean_temp and std_temp to sample_mean_list and sample_std_list
+
+sample_mean_list <- c()
+sample_std_list <- c()
+
+### Create a for loop that iterates from 2 to 10,000 values by increments of 1
+
+for(n in seq(2,10000,1)){
+  x <- rnorm(n, mean_val, std_val)
+  mean_temp <- mean(x)
+  std_temp <- sd(x)
+  sample_mean_list <- append(sample_mean_list, mean_temp)
+  sample_std_list <- append(sample_std_list, std_temp)
+}
+
+### Define a vector sample_vals that is a list that contains values between 2 and 10000
+
+sample_vals <- seq(2,10000)
+
+### Mean plot
+### Creating the threshold band (+-1%) for the population mean with arithmetic operators
+
+lower_range_mean <- mean_val * 0.99
+upper_range_mean <- mean_val * 1.01
+
+### Arguments for the plot function
+
+plot(sample_vals,
+     sample_mean_list,
+     type = "l",
+     main = "Mean Plot",
+     xlab = "Sample Size (CA Tracts)",
+     ylab = "Sample Mean Values (% in poverty)")
+
+### Using the abline function for plotting
+### Line type set to 2 to create dashed line representing the upper and lower threshold bands
+
+abline(h = lower_range_mean, col = "deeppink", lty = 2)
+abline(h = upper_range_mean, col = "deeppink", lty = 2)
+
+
+
+### Standard deviation plot
+### Creating the threshold band (+-1%) for the population standard deviation with arithmetic operators
+
+lower_range_std <- std_val * 0.99
+upper_range_std <- std_val * 1.01
+
+### Arguments for the plot function
+
+plot(sample_vals,
+     sample_std_list,
+     type = "l",
+     main = "Standard Deviation Plot",
+     xlab = "Sample Size (CA Tracts)",
+     ylab = "Sample SD Values (% in poverty)")
+
+### Using the abline function for plotting
+### Line type set to 2 to create dashed line representing the upper and lower threshold bands
+
+abline(h = lower_range_std, col = "deeppink", lty = 2)
+abline(h = upper_range_std, col = "deeppink", lty = 2)
+```
+
+```{r Defining Functions}
+
+### Setting up function 'get_rep_size' that will compute the minimum sample size from the population where the sample values fall within the threshold (+-1%)
+
+get_rep_size <- function(sample_sizes, sample_means, sample_sds, pop_mean, pop_sd){
+  lower_mean <- pop_mean * 0.99
+  upper_mean <- pop_mean * 1.01
+  lower_sd <- pop_sd * 0.99
+  upper_sd <- pop_sd * 1.01
+  mean_ind <- which(sample_means >= lower_mean & sample_means <= upper_mean)
+  sd_ind <- which(sample_sds >= lower_sd & sample_sds <= upper_sd)
+  index <- intersect(mean_ind, sd_ind)
+  
+  if (length(index) > 0){
+    return(sample_sizes[min(index)])
+  }else {
+    return(NULL)
+  }
+}
+```
+
+```{r Mean and SD Variation for Smallest Representative Sample Size}
+
+### Run function from the previous step to define the smallest representative sample size
+
+pop_mean <- mean(y, na.rm = T)
+
+pop_sd <- sd(y, na.rm = T)
+
+sample_size <- get_rep_size(sample_vals, 
+                            sample_mean_list, 
+                            sample_std_list, 
+                            pop_mean, pop_sd)
+
+
+### Obtain samples for the sample size you found with the function
+### 100 times and for every run record the sample mean and standard deviation
+### Create two empty lists that will take the sample mean and standard deviation values
+
+sample_mean <- c()
+sample_sd <- c()
+
+for(i in seq(100)){
+  x <- rnorm(sample_size, mean = pop_mean, sd = pop_sd)
+  sample_mean <- append(sample_mean, mean(x))
+  sample_sd <- append(sample_sd, sd(x))
+}
+```
+
+```{r Creating and Displaying Data Frames}
+
+### Create a Data Frame with columns Sample Size, Sample Mean, Sample SD and populate it with corresponding lists from the previous steps
+
+plot_df <- data.frame()
+
+print(paste0("Data Frame Column Names Before Assignment: ", colnames(plot_df)))
+
+### Assigning three new variables into the Data Frame
+
+plot_df <- data.frame('Sample Size' = sample_size,
+                      'Sample_Mean' = sample_mean, 
+                      'Sample_SD' = sample_sd)
+
+### Display the Data Frame
+
+head(plot_df)
+```
+
+```{r Plotting the distribution}
+
+### Plot the probability distribution function for sample means
+### Using ggplot to plot the PDF of the sample mean values
+### Using additive operators to add the different plot components: histogram of the sample mean, dashed mean line, pdf curve, and labels
+
+ggplot(plot_df, aes(x = Sample_Mean)) +
+  geom_density(alpha = 0.3, fill = "deeppink") +
+  geom_vline(aes(xintercept = mean(sample_mean)),
+             color = "red", 
+             linetype = "dashed",
+             size = 1) +
+  labs(title = "Probability Distribution Function Plot for the Sample Mean Values ",
+       x = "Sample Mean (% in poverty)",
+       y = "Density") +
+  theme_minimal()
+```

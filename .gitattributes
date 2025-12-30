@@ -6,3 +6,4 @@
 
 # Treat rendered R Notebooks as R Markdown
 *.nb.html linguist-language=RMarkdown
+*.html linguist-language=RMarkdown

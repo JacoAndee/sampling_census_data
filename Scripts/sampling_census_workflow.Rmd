@@ -1,13 +1,13 @@
 ---
 title: "Sampling Poverty from California Census Tracts"
-output:
-  html_document:
-    df_print: paged
+output: md_document
 ---
+
+# Sampling Poverty from California Census Tracts
 
 **Author: Jacob Anderson**
 
-**Sampling from American Community Survey Data**
+### Load the required packages
 
 ```{r Load tidycensus, sf, dplyr, ggplot2}
 
@@ -17,14 +17,16 @@ library(dplyr)
 library(ggplot2)
 ```
 
+### Connect to the API and select key variables
+
 ```{r Apply credentials}
 
 ### Save the census api key in script
 
 tidycensus::census_api_key(
-  key = "1d9fe19026f3759c68bc48e2c7ddf1b2b17ec47b",
-  install = F, 
-  overwrite = F)
+  key = Sys.getenv("CENSUS_API_KEY"),
+  install = T, 
+  overwrite = T)
 ```
 
 ```{r Set variables and make request to ACS API}
@@ -53,12 +55,16 @@ tract_acs_df <- as.data.frame(ca_acs)
 head(tract_acs_df)
 ```
 
+### Set seed for reproducability
+
 ```{r Setting Seed for reproducability}
 
 ### Set seed for reproducability
 
 set.seed(1)
 ```
+
+### Defining the random variables for sampling - Percent in poverty
 
 ```{r Defining and Printing Random Variables}
 
@@ -93,7 +99,7 @@ x <- rnorm(n, mean = mean_val, sd = std_val)
 print(x)
 ```
 
-**How Many Samples are Enough?**
+### How Many Samples are Enough?
 
 ```{r Sampling from the population}
 
@@ -164,6 +170,8 @@ abline(h = lower_range_std, col = "deeppink", lty = 2)
 abline(h = upper_range_std, col = "deeppink", lty = 2)
 ```
 
+### Creating function for computing the sample size needed for the threshold
+
 ```{r Defining Functions}
 
 ### Setting up function 'get_rep_size' that will compute the minimum sample size from the population where the sample values fall within the threshold (+-1%)
@@ -184,6 +192,8 @@ get_rep_size <- function(sample_sizes, sample_means, sample_sds, pop_mean, pop_s
   }
 }
 ```
+
+### Compute the mean and standard deviation using the function
 
 ```{r Mean and SD Variation for Smallest Representative Sample Size}
 
@@ -213,6 +223,8 @@ for(i in seq(100)){
 }
 ```
 
+### Create a new data frame
+
 ```{r Creating and Displaying Data Frames}
 
 ### Create a Data Frame with columns Sample Size, Sample Mean, Sample SD and populate it with corresponding lists from the previous steps
@@ -231,6 +243,8 @@ plot_df <- data.frame('Sample Size' = sample_size,
 
 head(plot_df)
 ```
+
+### Plot the result as a distribution
 
 ```{r Plotting the distribution}
 
